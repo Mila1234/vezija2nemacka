@@ -1,6 +1,9 @@
 package com.example.marija.myapplication;
 
+import android.app.ProgressDialog;
+import android.content.Context;
 import android.graphics.BitmapFactory;
+import android.os.AsyncTask;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.view.View;
@@ -17,11 +20,17 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.gson.Gson;
 
 import java.io.BufferedReader;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.ProtocolException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLEncoder;
@@ -37,6 +46,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private GoogleMap mMap;
     private ArrayList<LatLng> arrayLatLng = new ArrayList<>();
     private EditText textView;
+    private final String USER_AGENT = "Mozilla/5.0";
+    private ProgressDialog progress;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,98 +64,166 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
 
         Button button=(Button)findViewById(R.id.button);
-
-        button.setOnClickListener(new Button.OnClickListener(){
-
-            public void onClick(View v)
-            {
-                try{
-
-                    // CALL GetText method to make post method call
-                    GetText();
-                }
-                catch(Exception ex)
-                {
-                    Toast.makeText(MapsActivity.this,"greska",Toast.LENGTH_SHORT).show();
-                }
-            }
-        });
-
-
-
+        sendGetRequest(button);
 
     }
 
-    // Create GetText Metod
-    public  void  GetText()  throws UnsupportedEncodingException
-    {
-        // Get user defined values
+    public void sendPostRequest(View View) {
+        new PostClass(this).execute();
+    }
+
+    public void sendGetRequest(View View) {
+        new GetClass(this).execute();
+    }
+
+    private class PostClass extends AsyncTask<String, Void, Void> {
+
+        private final Context context;
+
+        public PostClass(Context c){
+
+            this.context = c;
+//            this.error = status;
+//            this.type = t;
+        }
+
+        protected void onPreExecute(){
+            progress= new ProgressDialog(this.context);
+            progress.setMessage("Loading");
+            progress.show();
+        }
+
+        @Override
+        protected Void doInBackground(String... params) {
+            try {
+
+                final TextView outputView = (TextView) findViewById(R.id.textView);
+                URL url = new URL("http://requestb.in/1cs29cy1");
+
+                HttpURLConnection connection = (HttpURLConnection)url.openConnection();
+                String urlParameters = "fizz=buzz";
+                connection.setRequestMethod("POST");
+                connection.setRequestProperty("USER-AGENT", "Mozilla/5.0");
+                connection.setRequestProperty("ACCEPT-LANGUAGE", "en-US,en;0.5");
+                connection.setDoOutput(true);
+                DataOutputStream dStream = new DataOutputStream(connection.getOutputStream());
+                dStream.writeBytes(urlParameters);
+                dStream.flush();
+                dStream.close();
+                int responseCode = connection.getResponseCode();
+
+                System.out.println("\nSending 'POST' request to URL : " + url);
+                System.out.println("Post parameters : " + urlParameters);
+                System.out.println("Response Code : " + responseCode);
+
+                final StringBuilder output = new StringBuilder("Request URL " + url);
+                output.append(System.getProperty("line.separator") + "Request Parameters " + urlParameters);
+                output.append(System.getProperty("line.separator")  + "Response Code " + responseCode);
+                output.append(System.getProperty("line.separator")  + "Type " + "POST");
+                BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                String line = "";
+                StringBuilder responseOutput = new StringBuilder();
+                System.out.println("output===============" + br);
+                while((line = br.readLine()) != null ) {
+                    responseOutput.append(line);
+                }
+                br.close();
+
+                output.append(System.getProperty("line.separator") + "Response " + System.getProperty("line.separator") + System.getProperty("line.separator") + responseOutput.toString());
+
+                MapsActivity.this.runOnUiThread(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        outputView.setText(output);
+                        progress.dismiss();
+                    }
+                });
 
 
-        // Create data variable for sent values to server
-
-        String data = URLEncoder.encode("/json/", "UTF-8")
-                + "?q=" + URLEncoder.encode("37.201.171.130", "UTF-8");
-
-
-
-        String text = "";
-        BufferedReader reader=null;
-
-        // Send data
-        try
-        {
-
-            // Defined URL  where to send data
-            URL url = new URL("https://freegeoip.net");
-
-            // Send POST data request
-
-            URLConnection conn = url.openConnection();
-            conn.setDoOutput(true);
-            OutputStreamWriter wr = new OutputStreamWriter(conn.getOutputStream());
-            wr.write( data );
-            wr.flush();
-
-            // Get the server response
-
-            reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-            StringBuilder sb = new StringBuilder();
-            String line = null;
-
-            // Read Server Response
-            while((line = reader.readLine()) != null)
-            {
-                // Append server response in string
-                sb.append(line + "\n");
+            } catch (MalformedURLException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
             }
-
-
-            text = sb.toString();
-        }
-        catch(Exception ex)
-        {
-
-        }
-        finally
-        {
-            try
-            {
-
-                reader.close();
-            }
-
-            catch(Exception ex) {}
+            return null;
         }
 
-        // Show response on activity
-        textView.setText( text  );
+        protected void onPostExecute() {
+            progress.dismiss();
+        }
 
     }
 
+    private class GetClass extends AsyncTask<String, Void, Void> {
+
+        private final Context context;
+
+        public GetClass(Context c){
+            this.context = c;
+        }
+
+        protected void onPreExecute(){
+            progress= new ProgressDialog(this.context);
+            progress.setMessage("Loading");
+            progress.show();
+        }
+
+        @Override
+        protected Void doInBackground(String... params) {
+            try {
+
+                final TextView outputView = (TextView) findViewById(R.id.textView);
+                URL url = new URL("https://freegeoip.net/json/?q=37.201.171.130");
+                HttpURLConnection connection = (HttpURLConnection)url.openConnection();
+                connection.setRequestMethod("GET");
+                connection.setRequestProperty("USER-AGENT", "Mozilla/5.0");
+                connection.setRequestProperty("ACCEPT-LANGUAGE", "en-US,en;0.5");
+
+                int responseCode = connection.getResponseCode();
+                BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                StringBuilder sb = new StringBuilder();
+                switch (responseCode) {
+                    case 200:
+                    case 201:
+                        String line;
+                        while ((line = br.readLine()) != null) {
+                            sb.append(line+"\n");
+                        }
+                        br.close();
+                }
+
+                final Mirko msg = new Gson().fromJson(sb.toString(), Mirko.class);
 
 
+                MapsActivity.this.runOnUiThread(new Runnable() {
 
+                    @Override
+                    public void run() {
+                        outputView.setText( msg.toString());
+                        progress.dismiss();
+
+                    }
+                });
+
+
+            } catch (MalformedURLException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            return null;
+        }
+
+//        protected void onPostExecute() {
+//            progress.dismiss();
+//        }
+
+    }
     /**
      * Manipulates the map once available.
      * This callback is triggered when the map is ready to be used.
